@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<tryton>
+    <data>
+        <record model="ir.ui.view" id="shipment_view_form">
+            <field name="model">stock.shipment.out</field>
+            <field name="inherit" ref="stock.shipment_out_view_form"/>
+            <field name="name">shipment_form</field>
+        </record>
+
+        <record model="ir.ui.view" id="shipping_gls_config_wizard_view_form">
+            <field name="model">shipping.label.gls</field>
+            <field name="type">form</field>
+            <field name="name">shipping_gls_config_form</field>
+        </record>
+
+        <record model="ir.ui.view" id="package_view_tree">
+            <field name="model">stock.package</field>
+            <field name="inherit" ref="stock_package.package_view_tree"/>
+            <field name="name">package_tree</field>
+        </record>
+    </data>
+</tryton>

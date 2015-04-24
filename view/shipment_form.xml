@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<data>
+    <xpath expr="/form/notebook/page[@id=&quot;outgoing_moves&quot;]" position="after">
+        <page string="GLS" id="gls" states="{'invisible': Not(Bool(Eval('is_gls_shipping')))}">
+            <label name="gls_shipping_depot_number"/>
+            <field name="gls_shipping_depot_number"/>
+            <label name="gls_shipping_service_type"/>
+            <field name="gls_shipping_service_type"/>
+        </page>
+    </xpath>
+</data>
