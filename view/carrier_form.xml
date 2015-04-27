@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data>
+    <xpath expr="/form/field[@name='carrier_cost_method']" position="after">
+        <newline/>
+        <group id='gls_unibox_config' string="GLS Unibox Configuration"
+            states="{'invisible': Not(Eval('carrier_cost_method') == 'gls')}"
+            colspan="4">
+          <label name="gls_server"/>
+          <field name="gls_server"/>
+          <label name="gls_port"/>
+          <field name="gls_port"/>
+          <label name="gls_contract"/>
+          <field name="gls_contract"/>
+          <label name="gls_customer_id"/>
+          <field name="gls_customer_id"/>
+          <label name="gls_location"/>
+          <field name="gls_location"/>
+          <label name="gls_shipping_depot_number"/>
+          <field name="gls_shipping_depot_number"/>
+          <label name="gls_shipping_service_type"/>
+          <field name="gls_shipping_service_type"/>
+        </group>
+    </xpath>
+</data>
