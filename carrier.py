@@ -54,6 +54,9 @@ class Carrier:
         GLS_SERVICES, 'GLS Service/Product Type',
         states=STATES, depends=DEPENDS
     )
+    gls_is_test = fields.Boolean(
+        'Is Test', states=STATES, depends=DEPENDS
+    )
 
     def __init__(self, *args, **kwargs):
         super(Carrier, self).__init__(*args, **kwargs)
@@ -76,6 +79,7 @@ class Carrier:
                 self.gls_server,
                 self.gls_port
             )
+            client.test = self.gls_is_test
             self._gls_unibox_client = client
 
         return self._gls_unibox_client

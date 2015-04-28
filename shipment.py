@@ -5,13 +5,16 @@
     :copyright: (c) 2015 by Openlabs Technologies & Consulting (P) Limited
     :license: BSD, see LICENSE for more details.
 """
+import os
 from gls_unibox_api.api import Response, Shipment
 from random import randint
+from pystache import Renderer
 
 from trytond.pool import PoolMeta, Pool
 from trytond.model import fields, ModelView
 from trytond.wizard import Wizard, StateView, Button
 from trytond.pyson import Eval, Bool
+from trytond.tools import file_open
 
 __all__ = ['ShipmentOut', 'Package', 'GenerateShippingLabel', 'ShippingGLS']
 __metaclass__ = PoolMeta
@@ -53,7 +56,7 @@ DEPENDS = ['is_gls_shipping', 'state']
 class Package:
     __name__ = 'stock.package'
 
-    parcel_number = fields.Char(
+    gls_parcel_number = fields.Char(
         "Parcel Number", size=12,
         readonly=True
     )
@@ -64,7 +67,7 @@ class Package:
 
         cls._sql_constraints += [
             (
-                'unique_parcel_number', 'UNIQUE(parcel_number)',
+                'unique_parcel_number', 'UNIQUE(gls_parcel_number)',
                 'The parcel number must be unique'
             )
         ]
@@ -120,6 +123,114 @@ class Package:
         check_digit = self._gen_parcel_check_number(result)
 
         return result + check_digit
+
+    def _make_gls_label(self):
+        """
+        This method gets the prepared Shipment object and calls the GLS API
+        for label generation.
+        """
+        Attachment = Pool().get('ir.attachment')
+
+        shipment = self._get_shipment_object()
+        response = Response.parse(shipment.create_label())
+
+        # Get tracking number
+        tracking_number = response.values.get('T8913')
+        assert tracking_number
+
+        # Create attachment
+        # When saving data, the rendered template needs to be encoded back
+        # to latin-1. This prevents any issues when a hexdigest of the data
+        # is created by the data field setter.
+        Attachment.create([{
+            'name': "%s_%s.zpl" % (tracking_number, self.gls_parcel_number),
+            'data': self.render_template(
+                self.get_template_data(
+                    'shipping_gls/labels/standard_label.txt'
+                ),
+                response.values
+            ).encode('latin-1'),
+            'resource': '%s,%s' % (self.shipment.__name__, self.shipment.id),
+        }])
+
+        return tracking_number
+
+    def _get_shipment_object(self):
+        """
+        This method returns a Shipment object for consumption by the GLS API
+        """
+        shipment = self.shipment
+
+        client = shipment.carrier.get_unibox_client()
+        shipment_api = Shipment(client)
+
+        shipment_api.software.name = 'Python'
+        shipment_api.software.version = '2.7'
+
+        consignee_address = shipment.customer.addresses[0]
+        consignor_address = shipment.company.party.addresses[0]
+
+        shipment_api.consignee.country = consignee_address.country.code
+        shipment_api.consignee.zip = consignee_address.zip
+        shipment_api.shipping_date = shipment.effective_date
+
+        # TODO: Remove hardcoded values
+        shipment_api.consignor.customer_number = 15082
+        shipment_api.consignor.name = shipment.company.party.name
+        shipment_api.consignor.name2 = consignor_address.name
+        shipment_api.consignor.street = consignor_address.street
+        shipment_api.consignor.country = consignor_address.country.code
+        shipment_api.consignor.zip = consignor_address.zip
+        shipment_api.consignor.place = consignor_address.city
+        shipment_api.consignor.label = 'Empfanger'
+        shipment_api.consignor.consignor = 'Essen'
+
+        shipment_api.consignee.customer_number_label = 'Kd-Nr'
+        shipment_api.consignee.customer_number = 4600
+        shipment_api.consignee.id_type = 'ID-Nr'
+        shipment_api.consignee.id_value = 800018406
+
+        shipment_api.parcel = self.code  # sequence
+        shipment_api.parcel_weight = self.package_weight
+
+        shipment_api.parcel_number = self.gls_parcel_number
+        shipment_api.quantity = 1
+
+        shipment_api.gls_contract = shipment.carrier.gls_contract
+        shipment_api.gls_customer_id = shipment.carrier.gls_customer_id
+        shipment_api.location = shipment.carrier.gls_location
+
+        return shipment_api
+
+    @classmethod
+    def get_template_data(cls, template_path):
+        """
+        Returns template data given a template path.
+
+        :param path: String of the form '<module_name>/path/to/templates'
+        """
+        module, path = template_path.split('/', 1)
+
+        try:
+            with file_open(os.path.join(module, path)) as f:
+                return f.read()
+        except IOError:
+            return None
+
+    @classmethod
+    def render_template(cls, template_string, context):
+        """
+        Render the template using pystache - this library has been chosen due to
+        the fact that most web-ready templating engines in Python cannot deal
+        with non-ascii characters when rendering a template. Pystache allows us
+        to do so by setting attributes like string_encoding and file_encoding.
+
+        The data returned from the GLS Server is presumably in latin-1 encoding,
+        which is non-ascii and fits this use case.
+        """
+        renderer = Renderer(string_encoding='latin-1')
+
+        return renderer.render(template_string, context)
 
 
 class ShipmentOut:
@@ -192,77 +303,12 @@ class ShipmentOut:
             self.raise_user_error('wrong_carrier', 'GLS')
 
         for package in self.packages:
-            package.parcel_number = package._gen_parcel_number()
+            package.gls_parcel_number = package._gen_parcel_number()
 
             if not package.tracking_number:
-                tracking_number = self._make_gls_label(package)
-                package.tracking_number = tracking_number
+                tracking_number = package._make_gls_label()
+                package.tracking_number = tracking_number.strip()
             package.save()
-
-    def _get_shipment_object(self, package):
-        """
-        This method returns a Shipment object for consumption by the GLS API
-        """
-        client = self.carrier.get_unibox_client()
-        shipment = Shipment(client)
-
-        shipment.software.name = 'Python'
-        shipment.software.version = '2.7'
-
-        consignee_address = self.customer.addresses[0]
-        consignor_address = self.company.party.addresses[0]
-
-        shipment.consignee.country = consignee_address.country.code
-        shipment.consignee.zip = consignee_address.zip
-        shipment.shipping_date = self.effective_date
-
-        # TODO: Remove hardcoded values
-        shipment.consignor.customer_number = 15082
-        shipment.consignor.name = self.company.party.name
-        shipment.consignor.name2 = consignor_address.name
-        shipment.consignor.street = consignor_address.street
-        shipment.consignor.country = consignor_address.country.code
-        shipment.consignor.zip = consignor_address.zip
-        shipment.consignor.place = consignor_address.city
-        shipment.consignor.label = 'Empfanger'
-        shipment.consignor.consignor = 'Essen'
-
-        shipment.consignee.customer_number_label = 'Kd-Nr'
-        shipment.consignee.customer_number = 4600
-        shipment.consignee.id_type = 'ID-Nr'
-        shipment.consignee.id_value = 800018406
-
-        shipment.parcel = package.code  # sequence
-        shipment.parcel_weight = package.package_weight
-
-        shipment.parcel_number = package.parcel_number
-        shipment.quantity = 1
-
-        shipment.gls_contract = self.carrier.gls_contract
-        shipment.gls_customer_id = self.carrier.gls_customer_id
-        shipment.location = self.carrier.gls_location
-
-        return shipment
-
-    def _make_gls_label(self, package):
-        """
-        This method gets the prepared Shipment object and calls the GLS API
-        for label generation.
-        """
-        shipment = self._get_shipment_object(package)
-
-        response = shipment.create_label()
-        tracking_number = self.get_tracking_number(response)
-
-        return tracking_number
-
-    def get_tracking_number(self, response):
-        """
-        This method parses the response string and returns the tracking number
-        """
-        response = Response.parse(response)
-
-        return response.values.get('T8913')
 
 
 class GenerateShippingLabel(Wizard):

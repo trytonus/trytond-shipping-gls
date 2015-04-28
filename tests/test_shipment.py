@@ -305,6 +305,7 @@ class TestGLSShipping(unittest.TestCase):
             'gls_customer_id': '2760179437',
             'gls_location': 'DE 460',
             'gls_shipping_depot_number': '46',
+            'gls_is_test': True,
         }
 
         self.carrier, = self.Carrier.create([values])
@@ -357,12 +358,20 @@ class TestGLSShipping(unittest.TestCase):
         with Transaction().set_context(company=self.company.id):
 
             # Create sale order
-            sale_line = self.SaleLine(**{
+            sale_line1 = self.SaleLine(**{
                 'type': 'line',
                 'quantity': 1,
                 'product': self.product,
                 'unit_price': Decimal('10.00'),
                 'description': 'Test Description1',
+                'unit': self.product.template.default_uom,
+            })
+            sale_line2 = self.SaleLine(**{
+                'type': 'line',
+                'quantity': 1,
+                'product': self.product,
+                'unit_price': Decimal('5.00'),
+                'description': 'Test Description2',
                 'unit': self.product.template.default_uom,
             })
             sale = self.Sale(**{
@@ -372,7 +381,7 @@ class TestGLSShipping(unittest.TestCase):
                 'invoice_address': party.addresses[0].id,
                 'shipment_address': party.addresses[0].id,
                 'carrier': self.carrier.id,
-                'lines': [sale_line],
+                'lines': [sale_line1, sale_line2],
                 'gls_shipping_depot_number': '46',
             })
 
@@ -385,7 +394,7 @@ class TestGLSShipping(unittest.TestCase):
             })
 
             # Confirm and process sale order
-            self.assertEqual(len(sale.lines), 1)
+            self.assertEqual(len(sale.lines), 2)
             self.Sale.quote([sale])
             self.Sale.confirm([sale])
             self.Sale.process([sale])
@@ -394,6 +403,8 @@ class TestGLSShipping(unittest.TestCase):
         """
         Test that GLS labels are being generated
         """
+        Attachment = POOL.get('ir.attachment')
+
         with Transaction().start(DB_NAME, USER, context=CONTEXT):
 
             # Call method to create sale order
@@ -413,11 +424,17 @@ class TestGLSShipping(unittest.TestCase):
             package_type, = self.PackageType.create([{
                 'name': 'Box',
             }])
-            package, = self.Package.create([{
+            package1, = self.Package.create([{
                 'code': 'ABC',
                 'type': package_type.id,
                 'shipment': (shipment.__name__, shipment.id),
-                'moves': [('add', map(int, shipment.outgoing_moves))],
+                'moves': [('add', [shipment.outgoing_moves[0].id])],
+            }])
+            package2, = self.Package.create([{
+                'code': 'DEF',
+                'type': package_type.id,
+                'shipment': (shipment.__name__, shipment.id),
+                'moves': [('add', [shipment.outgoing_moves[1].id])],
             }])
 
             with Transaction().set_context(
@@ -447,3 +464,13 @@ class TestGLSShipping(unittest.TestCase):
 
             for package in shipment.packages:
                 self.assertFalse(package.tracking_number is None)
+                self.assertFalse(package.gls_parcel_number is None)
+
+            self.assertEqual(
+                Attachment.search_count([
+                    (
+                        'resource', 'like',
+                        '%s,%s' % (shipment.__name__, shipment.id)
+                    )
+                ]), len(shipment.packages)
+            )
