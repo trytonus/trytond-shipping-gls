@@ -306,6 +306,10 @@ class TestGLSShipping(unittest.TestCase):
             'gls_location': 'DE 460',
             'gls_shipping_depot_number': '46',
             'gls_is_test': True,
+            'gls_customer_number': '15082',
+            'gls_consignor_label': 'Empfanger',
+            'gls_customer_id_label': 'ID-Nr',
+            'gls_customer_label': 'Kd-Nr',
         }
 
         self.carrier, = self.Carrier.create([values])

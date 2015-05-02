@@ -13,12 +13,20 @@
           <field name="gls_contract"/>
           <label name="gls_customer_id"/>
           <field name="gls_customer_id"/>
+          <label name="gls_customer_number"/>
+          <field name="gls_customer_number"/>
           <label name="gls_location"/>
           <field name="gls_location"/>
           <label name="gls_shipping_depot_number"/>
           <field name="gls_shipping_depot_number"/>
           <label name="gls_shipping_service_type"/>
           <field name="gls_shipping_service_type"/>
+          <label name="gls_customer_label"/>
+          <field name="gls_customer_label"/>
+          <label name="gls_customer_id_label"/>
+          <field name="gls_customer_id_label"/>
+          <label name="gls_consignor_label"/>
+          <field name="gls_consignor_label"/>
           <newline/>
           <label name="gls_is_test"/>
           <field name="gls_is_test"/>
