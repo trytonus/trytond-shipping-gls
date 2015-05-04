@@ -57,6 +57,24 @@ class Carrier:
     gls_is_test = fields.Boolean(
         'Is Test', states=STATES, depends=DEPENDS
     )
+    gls_customer_number = fields.Char(
+        "GLS Customer Number", states=STATES, depends=DEPENDS
+    )
+    gls_customer_label = fields.Char(
+        'GLS Customer Name Label', states={
+            'invisible': Eval('carrier_cost_method') != 'gls',
+        }, depends=DEPENDS
+    )
+    gls_customer_id_label = fields.Char(
+        'GLS Customer ID Label', states={
+            'invisible': Eval('carrier_cost_method') != 'gls',
+        }, depends=DEPENDS
+    )
+    gls_consignor_label = fields.Char(
+        'GLS Consignor Label', states={
+            'invisible': Eval('carrier_cost_method') != 'gls',
+        }, depends=DEPENDS
+    )
 
     def __init__(self, *args, **kwargs):
         super(Carrier, self).__init__(*args, **kwargs)

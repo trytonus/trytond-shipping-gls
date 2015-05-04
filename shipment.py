@@ -174,27 +174,25 @@ class Package:
         shipment_api.consignee.zip = consignee_address.zip
         shipment_api.shipping_date = shipment.effective_date
 
-        # TODO: Remove hardcoded values
-        shipment_api.consignor.customer_number = 15082
+        shipment_api.consignor.customer_number = shipment.carrier.gls_customer_number  # noqa
         shipment_api.consignor.name = shipment.company.party.name
         shipment_api.consignor.name2 = consignor_address.name
         shipment_api.consignor.street = consignor_address.street
         shipment_api.consignor.country = consignor_address.country.code
         shipment_api.consignor.zip = consignor_address.zip
         shipment_api.consignor.place = consignor_address.city
-        shipment_api.consignor.label = 'Empfanger'
-        shipment_api.consignor.consignor = 'Essen'
+        shipment_api.consignor.label = shipment.carrier.gls_consignor_label  # German for 'recipient' # noqa
+        shipment_api.consignor.consignor = shipment.carrier.party.name  # Shipment deliverer # noqa
 
-        shipment_api.consignee.customer_number_label = 'Kd-Nr'
-        shipment_api.consignee.customer_number = 4600
-        shipment_api.consignee.id_type = 'ID-Nr'
-        shipment_api.consignee.id_value = 800018406
+        shipment_api.consignee.customer_number_label = shipment.carrier.gls_customer_label  # Labeling of customer number # noqa
+        shipment_api.consignee.customer_number = shipment.customer.id  # optional customer number # noqa
+        shipment_api.consignee.id_type = shipment.carrier.gls_customer_id_label  # labeling of ID number # noqa
+        shipment_api.consignee.id_value = shipment.customer.code  # Optional customer ID # noqa
 
-        shipment_api.parcel = self.code  # sequence
+        shipment_api.parcel = self.code  # mandatory - sequence/code
         shipment_api.parcel_weight = self.package_weight
 
         shipment_api.parcel_number = self.gls_parcel_number
-        shipment_api.quantity = 1
 
         shipment_api.gls_contract = shipment.carrier.gls_contract
         shipment_api.gls_customer_id = shipment.carrier.gls_customer_id
