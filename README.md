@@ -1,1 +1,0 @@
-# trytond-shipping-gls

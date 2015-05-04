@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<form string="GLS Configuration" col="4">
+    <label name="service_type"/>
+    <field name="service_type"/>
+    <label name="depot_number"/>
+    <field name="depot_number"/>
+</form>

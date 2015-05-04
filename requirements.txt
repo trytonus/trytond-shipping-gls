@@ -1,0 +1,10 @@
+# Install shipping from stock_package branch for now
+https://github.com/openlabs/trytond-shipping/archive/stock-package.tar.gz
+
+# Install GLS Unibox API
+gls_unibox_api
+
+psycopg2
+
+# Install this package itself
+.
