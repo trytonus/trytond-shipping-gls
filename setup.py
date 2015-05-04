@@ -81,6 +81,7 @@ major_version = int(major_version)
 minor_version = int(minor_version)
 
 requires = [
+    'gls_unibox_api',
     'pystache',
 ]
 
