@@ -6,7 +6,8 @@
     :license: BSD, see LICENSE for more details.
 """
 from trytond.pool import Pool
-from shipment import Package, ShipmentOut, GenerateShippingLabel, ShippingGLS
+from shipment import Package, ShipmentOut, GenerateShippingLabel, ShippingGLS, \
+    Address
 from carrier import Carrier
 from sale import Sale
 
@@ -18,6 +19,7 @@ def register():
         Package,
         ShipmentOut,
         ShippingGLS,
+        Address,
         module='shipping_gls', type_='model'
     )
 
