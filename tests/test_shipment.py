@@ -466,9 +466,11 @@ class TestGLSShipping(unittest.TestCase):
 
                 generate_label.default_generate({})
 
+            self.assertFalse(shipment.tracking_number is None)
+            self.assertFalse(shipment.gls_parcel_number is None)
+
             for package in shipment.packages:
                 self.assertFalse(package.tracking_number is None)
-                self.assertFalse(package.gls_parcel_number is None)
 
             self.assertEqual(
                 Attachment.search_count([
@@ -476,5 +478,5 @@ class TestGLSShipping(unittest.TestCase):
                         'resource', 'like',
                         '%s,%s' % (shipment.__name__, shipment.id)
                     )
-                ]), len(shipment.packages)
+                ]), 2
             )
