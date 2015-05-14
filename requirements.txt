@@ -1,6 +1,3 @@
-# Install shipping from stock_package branch for now
-https://github.com/openlabs/trytond-shipping/archive/stock-package.tar.gz
-
 psycopg2
 
 # Install this package itself

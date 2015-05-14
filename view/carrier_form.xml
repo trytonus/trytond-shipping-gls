@@ -27,6 +27,8 @@
           <field name="gls_customer_id_label"/>
           <label name="gls_consignor_label"/>
           <field name="gls_consignor_label"/>
+          <label name="gls_printer_resolution"/>
+          <field name="gls_printer_resolution"/>
           <newline/>
           <label name="gls_is_test"/>
           <field name="gls_is_test"/>

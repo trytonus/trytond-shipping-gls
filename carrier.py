@@ -55,7 +55,9 @@ class Carrier:
         states=STATES, depends=DEPENDS
     )
     gls_is_test = fields.Boolean(
-        'Is Test', states=STATES, depends=DEPENDS
+        'Is Test', states={
+            'invisible': Eval('carrier_cost_method') != 'gls'
+        }, depends=DEPENDS
     )
     gls_customer_number = fields.Char(
         "GLS Customer Number", states=STATES, depends=DEPENDS
@@ -72,6 +74,16 @@ class Carrier:
     )
     gls_consignor_label = fields.Char(
         'GLS Consignor Label', states={
+            'invisible': Eval('carrier_cost_method') != 'gls',
+        }, depends=DEPENDS
+    )
+    gls_printer_resolution = fields.Selection(
+        [
+            ('zebrazpl200', '200dpi'),
+            ('zebrazpl300', '300dpi'),
+        ],
+        'GLS Printer Resolution',
+        states={
             'invisible': Eval('carrier_cost_method') != 'gls',
         }, depends=DEPENDS
     )
@@ -123,3 +135,7 @@ class Carrier:
     @staticmethod
     def default_gls_shipping_service_type():
         return 'euro_business_parcel'
+
+    @staticmethod
+    def default_gls_printer_resolution():
+        return 'zebrazpl200'

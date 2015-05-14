@@ -5,18 +5,18 @@
     :copyright: (c) 2015 by Openlabs Technologies & Consulting (P) Limited
     :license: BSD, see LICENSE for more details.
 """
-import os
 from gls_unibox_api.api import Response, Shipment
 from random import randint
-from pystache import Renderer
 
 from trytond.pool import PoolMeta, Pool
 from trytond.model import fields, ModelView
 from trytond.wizard import Wizard, StateView, Button
 from trytond.pyson import Eval, Bool
-from trytond.tools import file_open
 
-__all__ = ['ShipmentOut', 'Package', 'GenerateShippingLabel', 'ShippingGLS']
+__all__ = [
+    'ShipmentOut', 'Package', 'GenerateShippingLabel', 'ShippingGLS',
+    'Address'
+]
 __metaclass__ = PoolMeta
 
 GLS_SERVICES = [
@@ -56,6 +56,67 @@ DEPENDS = ['is_gls_shipping', 'state']
 class Package:
     __name__ = 'stock.package'
 
+    def _get_shipment_object(self):
+        """
+        This method returns a Shipment object for consumption by the GLS API
+        """
+        shipment = self.shipment
+
+        client = shipment.carrier.get_unibox_client()
+        shipment_api = Shipment(client)
+
+        shipment_api.software.name = 'Python'
+        shipment_api.software.version = '2.7'
+        shipment_api.printer_name = shipment.carrier.gls_printer_resolution
+
+        consignee_address = shipment.delivery_address
+        consignor_address = shipment._get_ship_from_address()
+
+        consignee_address._update_gls_address_in(
+            shipment_api.consignee)
+        shipment_api.shipping_date = shipment.effective_date
+
+        shipment_api.consignor.customer_number = shipment.carrier.gls_customer_number  # noqa
+        consignor_address._update_gls_address_in(
+            shipment_api.consignor)
+        shipment_api.consignor.label = shipment.carrier.gls_consignor_label  # German for 'recipient' # noqa
+        shipment_api.consignor.consignor = shipment.carrier.party.name  # Shipment deliverer # noqa
+
+        shipment_api.consignee.customer_number_label = shipment.carrier.gls_customer_label  # Labeling of customer number # noqa
+        shipment_api.consignee.customer_number = shipment.customer.id  # optional customer number # noqa
+        shipment_api.consignee.id_type = shipment.carrier.gls_customer_id_label  # labeling of ID number # noqa
+        shipment_api.consignee.id_value = shipment.customer.code  # Optional customer ID # noqa
+
+        shipment_api.quantity = len(shipment.packages)
+        shipment_api.parcel_weight = self.package_weight
+
+        shipment_api.parcel_number = shipment.gls_parcel_number
+
+        shipment_api.gls_contract = shipment.carrier.gls_contract
+        shipment_api.gls_customer_id = shipment.carrier.gls_customer_id
+        shipment_api.location = shipment.carrier.gls_location
+
+        return shipment_api
+
+
+class ShipmentOut:
+    __name__ = 'stock.shipment.out'
+
+    is_gls_shipping = fields.Function(
+        fields.Boolean('Is GLS Shipping?'),
+        getter='get_is_gls_shipping'
+    )
+
+    gls_shipping_depot_number = fields.Char(
+        "GLS Depot Number", size=2,
+        states=STATES, depends=DEPENDS
+    )
+
+    gls_shipping_service_type = fields.Selection(
+        GLS_SERVICES, 'GLS Service/Product Type', states=STATES,
+        depends=DEPENDS
+    )
+
     gls_parcel_number = fields.Char(
         "Parcel Number", size=12,
         readonly=True
@@ -63,7 +124,7 @@ class Package:
 
     @classmethod
     def __setup__(cls):
-        super(Package, cls).__setup__()
+        super(ShipmentOut, cls).__setup__()
 
         cls._sql_constraints += [
             (
@@ -71,6 +132,46 @@ class Package:
                 'The parcel number must be unique'
             )
         ]
+
+    @staticmethod
+    def default_gls_shipping_service_type():
+        return 'euro_business_parcel'
+
+    def get_is_gls_shipping(self, name=None):
+        """
+        Checks if shipping is to be done using GLS
+        """
+        return self.carrier and self.carrier.carrier_cost_method == 'gls'
+
+    @fields.depends('is_gls_shipping', 'carrier')
+    def on_change_carrier(self):
+        """
+        Show/Hide GLS tab in view on change of carrier
+        """
+        res = super(ShipmentOut, self).on_change_carrier()
+
+        if self.carrier and self.carrier.carrier_cost_method == 'gls':
+            res['is_gls_shipping'] = True
+            res['gls_shipping_depot_number'] = \
+                self.carrier.gls_shipping_depot_number
+            res['gls_shipping_service_type'] = \
+                self.carrier.gls_shipping_service_type
+
+            # Future-proof: change active record
+            self.is_gls_shipping = True
+            self.gls_shipping_depot_number = res['gls_shipping_depot_number']
+            self.gls_shipping_service_type = res['gls_shipping_service_type']
+
+        return res
+
+    def _get_weight_uom(self):
+        """
+        Return uom for GLS
+        """
+        UOM = Pool().get('product.uom')
+        if self.is_gls_shipping:
+            return UOM.search([('symbol', '=', 'kg')])[0]
+        return super(ShipmentOut, self)._get_weight_uom()  # pragma: no cover
 
     def _gen_parcel_check_number(self, parcel_number):
         """
@@ -114,8 +215,8 @@ class Package:
         )
 
         result = (
-            self.shipment.gls_shipping_depot_number +
-            GLS_PRODUCT_CODES[self.shipment.gls_shipping_service_type] +
+            self.gls_shipping_depot_number +
+            GLS_PRODUCT_CODES[self.gls_shipping_service_type] +
             intermediate_parcel_number
         )
 
@@ -123,171 +224,6 @@ class Package:
         check_digit = self._gen_parcel_check_number(result)
 
         return result + check_digit
-
-    def _make_gls_label(self):
-        """
-        This method gets the prepared Shipment object and calls the GLS API
-        for label generation.
-        """
-        Attachment = Pool().get('ir.attachment')
-
-        shipment = self._get_shipment_object()
-        response = Response.parse(shipment.create_label())
-
-        # Get tracking number
-        tracking_number = response.values.get('T8913')
-        assert tracking_number
-
-        # Create attachment
-        # When saving data, the rendered template needs to be encoded back
-        # to latin-1. This prevents any issues when a hexdigest of the data
-        # is created by the data field setter.
-        Attachment.create([{
-            'name': "%s_%s.zpl" % (tracking_number, self.gls_parcel_number),
-            'data': self.render_template(
-                self.get_template_data(
-                    'shipping_gls/labels/standard_label.txt'
-                ),
-                response.values
-            ).encode('latin-1'),
-            'resource': '%s,%s' % (self.shipment.__name__, self.shipment.id),
-        }])
-
-        return tracking_number
-
-    def _get_shipment_object(self):
-        """
-        This method returns a Shipment object for consumption by the GLS API
-        """
-        shipment = self.shipment
-
-        client = shipment.carrier.get_unibox_client()
-        shipment_api = Shipment(client)
-
-        shipment_api.software.name = 'Python'
-        shipment_api.software.version = '2.7'
-
-        consignee_address = shipment.customer.addresses[0]
-        consignor_address = shipment.company.party.addresses[0]
-
-        shipment_api.consignee.country = consignee_address.country.code
-        shipment_api.consignee.zip = consignee_address.zip
-        shipment_api.shipping_date = shipment.effective_date
-
-        shipment_api.consignor.customer_number = shipment.carrier.gls_customer_number  # noqa
-        shipment_api.consignor.name = shipment.company.party.name
-        shipment_api.consignor.name2 = consignor_address.name
-        shipment_api.consignor.street = consignor_address.street
-        shipment_api.consignor.country = consignor_address.country.code
-        shipment_api.consignor.zip = consignor_address.zip
-        shipment_api.consignor.place = consignor_address.city
-        shipment_api.consignor.label = shipment.carrier.gls_consignor_label  # German for 'recipient' # noqa
-        shipment_api.consignor.consignor = shipment.carrier.party.name  # Shipment deliverer # noqa
-
-        shipment_api.consignee.customer_number_label = shipment.carrier.gls_customer_label  # Labeling of customer number # noqa
-        shipment_api.consignee.customer_number = shipment.customer.id  # optional customer number # noqa
-        shipment_api.consignee.id_type = shipment.carrier.gls_customer_id_label  # labeling of ID number # noqa
-        shipment_api.consignee.id_value = shipment.customer.code  # Optional customer ID # noqa
-
-        shipment_api.parcel = self.code  # mandatory - sequence/code
-        shipment_api.parcel_weight = self.package_weight
-
-        shipment_api.parcel_number = self.gls_parcel_number
-
-        shipment_api.gls_contract = shipment.carrier.gls_contract
-        shipment_api.gls_customer_id = shipment.carrier.gls_customer_id
-        shipment_api.location = shipment.carrier.gls_location
-
-        return shipment_api
-
-    @classmethod
-    def get_template_data(cls, template_path):
-        """
-        Returns template data given a template path.
-
-        :param path: String of the form '<module_name>/path/to/templates'
-        """
-        module, path = template_path.split('/', 1)
-
-        try:
-            with file_open(os.path.join(module, path)) as f:
-                return f.read()
-        except IOError:
-            return None
-
-    @classmethod
-    def render_template(cls, template_string, context):
-        """
-        Render the template using pystache - this library has been chosen due to
-        the fact that most web-ready templating engines in Python cannot deal
-        with non-ascii characters when rendering a template. Pystache allows us
-        to do so by setting attributes like string_encoding and file_encoding.
-
-        The data returned from the GLS Server is presumably in latin-1 encoding,
-        which is non-ascii and fits this use case.
-        """
-        renderer = Renderer(string_encoding='latin-1')
-
-        return renderer.render(template_string, context)
-
-
-class ShipmentOut:
-    __name__ = 'stock.shipment.out'
-
-    is_gls_shipping = fields.Function(
-        fields.Boolean('Is GLS Shipping?'),
-        getter='get_is_gls_shipping'
-    )
-
-    gls_shipping_depot_number = fields.Char(
-        "GLS Depot Number", size=2,
-        states=STATES, depends=DEPENDS
-    )
-
-    gls_shipping_service_type = fields.Selection(
-        GLS_SERVICES, 'GLS Service/Product Type', states=STATES,
-        depends=DEPENDS
-    )
-
-    @staticmethod
-    def default_gls_shipping_service_type():
-        return 'euro_business_parcel'
-
-    def get_is_gls_shipping(self, name=None):
-        """
-        Checks if shipping is to be done using GLS
-        """
-        return self.carrier and self.carrier.carrier_cost_method == 'gls'
-
-    @fields.depends('is_gls_shipping', 'carrier')
-    def on_change_carrier(self):
-        """
-        Show/Hide GLS tab in view on change of carrier
-        """
-        res = super(ShipmentOut, self).on_change_carrier()
-
-        if self.carrier and self.carrier.carrier_cost_method == 'gls':
-            res['is_gls_shipping'] = True
-            res['gls_shipping_depot_number'] = \
-                self.carrier.gls_shipping_depot_number
-            res['gls_shipping_service_type'] = \
-                self.carrier.gls_shipping_service_type
-
-            # Future-proof: change active record
-            self.is_gls_shipping = True
-            self.gls_shipping_depot_number = res['gls_shipping_depot_number']
-            self.gls_shipping_service_type = res['gls_shipping_service_type']
-
-        return res
-
-    def _get_weight_uom(self):
-        """
-        Return uom for GLS
-        """
-        UOM = Pool().get('product.uom')
-        if self.is_gls_shipping:
-            return UOM.search([('symbol', '=', 'kg')])[0]
-        return super(ShipmentOut, self)._get_weight_uom()  # pragma: no cover
 
     def make_gls_labels(self):
         """
@@ -300,13 +236,43 @@ class ShipmentOut:
         if not self.is_gls_shipping:
             self.raise_user_error('wrong_carrier', 'GLS')
 
-        for package in self.packages:
-            package.gls_parcel_number = package._gen_parcel_number()
+        self.gls_parcel_number = self._gen_parcel_number()
+        self.save()
 
-            if not package.tracking_number:
-                tracking_number = package._make_gls_label()
-                package.tracking_number = tracking_number.strip()
+        if not self.tracking_number:
+            tracking_number = self._make_gls_label()
+            self.tracking_number = tracking_number.strip()
+        self.save()
+
+    def _make_gls_label(self):
+        """
+        This method gets the prepared Shipment object and calls the GLS API
+        for label generation.
+        """
+        Attachment = Pool().get('ir.attachment')
+
+        for index, package in enumerate(self.packages, start=1):
+            shipment = package._get_shipment_object()
+            shipment.parcel = index
+            label = shipment.create_label()
+            response = Response.parse(label)
+
+            # Get tracking number
+            tracking_number = response.values.get('T8913')
+            assert tracking_number
+
+            package.tracking_number = tracking_number
             package.save()
+
+            # Create attachment
+            Attachment.create([{
+                'name': "%s_%s_%s.zpl" % (
+                    tracking_number, self.gls_parcel_number, package.code),
+                'data': response.values.get('zpl_content'),
+                'resource': '%s,%s' % (self.__name__, self.id),
+            }])
+
+        return tracking_number
 
 
 class GenerateShippingLabel(Wizard):
@@ -365,3 +331,19 @@ class ShippingGLS(ModelView):
     depot_number = fields.Char(
         "GLS Depot Number", size=2, required=True
     )
+
+
+class Address:
+    __name__ = 'party.address'
+
+    def _update_gls_address_in(self, user):
+        """
+        Update the consignee/consignor from the current address
+        """
+        user.name = self.party.name
+        user.name2 = self.name
+        user.street = self.street
+        user.country = self.country.code
+        user.zip = self.zip
+        user.place = self.city
+        return user
