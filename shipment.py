@@ -72,12 +72,12 @@ class Package:
         consignee_address = shipment.delivery_address
         consignor_address = shipment._get_ship_from_address()
 
-        consignee_address._update_gls_address_to(
+        consignee_address._update_gls_address_in(
             shipment_api.consignee)
         shipment_api.shipping_date = shipment.effective_date
 
         shipment_api.consignor.customer_number = shipment.carrier.gls_customer_number  # noqa
-        consignor_address._update_gls_address_to(
+        consignor_address._update_gls_address_in(
             shipment_api.consignor)
         shipment_api.consignor.label = shipment.carrier.gls_consignor_label  # German for 'recipient' # noqa
         shipment_api.consignor.consignor = shipment.carrier.party.name  # Shipment deliverer # noqa
@@ -336,7 +336,7 @@ class ShippingGLS(ModelView):
 class Address:
     __name__ = 'party.address'
 
-    def _update_gls_address_to(self, user):
+    def _update_gls_address_in(self, user):
         """
         Update the consignee/consignor from the current address
         """
