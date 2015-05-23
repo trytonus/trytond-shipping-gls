@@ -88,7 +88,7 @@ class Package:
         shipment_api.consignee.id_value = shipment.customer.code  # Optional customer ID # noqa
 
         shipment_api.quantity = len(shipment.packages)
-        shipment_api.parcel_weight = self.package_weight
+        shipment_api.parcel_weight = self.weight
 
         shipment_api.parcel_number = shipment.gls_parcel_number
 

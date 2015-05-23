@@ -297,6 +297,7 @@ class TestGLSShipping(unittest.TestCase):
 
         values = {
             'party': carrier_party.id,
+            'currency': self.company.currency.id,
             'carrier_product': carrier_product.id,
             'carrier_cost_method': 'gls',
             'gls_server': self.gls_server,
