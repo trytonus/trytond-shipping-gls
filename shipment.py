@@ -2,8 +2,6 @@
 """
     carrier.py
 
-    :copyright: (c) 2015 by Openlabs Technologies & Consulting (P) Limited
-    :license: BSD, see LICENSE for more details.
 """
 from gls_unibox_api.api import Response, Shipment
 from random import randint
