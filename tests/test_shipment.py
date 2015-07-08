@@ -2,8 +2,6 @@
 """
     test_shipment
     Test GLS Integration
-    :copyright: (c) 2014 by Openlabs Technologies & Consulting (P) Limited
-    :license: GPLv3, see LICENSE for more details.
 """
 from decimal import Decimal
 from datetime import datetime
