@@ -12,11 +12,5 @@
             <field name="type">form</field>
             <field name="name">shipping_gls_config_form</field>
         </record>
-
-        <record model="ir.ui.view" id="package_view_tree">
-            <field name="model">stock.package</field>
-            <field name="inherit" ref="stock_package.package_view_tree"/>
-            <field name="name">package_tree</field>
-        </record>
     </data>
 </tryton>
