@@ -86,6 +86,13 @@ class Carrier:
         }, depends=DEPENDS
     )
 
+    @classmethod
+    def view_attributes(cls):
+        return super(Carrier, cls).view_attributes() + [
+            ('//page[@id="gls_unibox_config"]', 'states', {
+                'invisible':  Eval('carrier_cost_method') != 'gls'
+            })]
+
     def __init__(self, *args, **kwargs):
         super(Carrier, self).__init__(*args, **kwargs)
         self._gls_unibox_client = None

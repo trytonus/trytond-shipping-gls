@@ -13,32 +13,15 @@ if os.path.isdir(DIR):
 import unittest
 
 import trytond.tests.test_tryton
-from trytond.tests.test_tryton import test_view, test_depends
+from trytond.tests.test_tryton import ModuleTestCase
 
 
-class TestViewsDepends(unittest.TestCase):
+class TestViewsDepends(ModuleTestCase):
     '''
     Test views and depends
     '''
 
-    def setUp(self):
-        """
-        Set up data used in the tests.
-        this method is called before each test function execution.
-        """
-        trytond.tests.test_tryton.install_module('shipping_gls')
-
-    def test0005views(self):
-        '''
-        Test views.
-        '''
-        test_view('shipping_gls')
-
-    def test0006depends(self):
-        '''
-        Test depends.
-        '''
-        test_depends()
+    module = 'shipping_gls'
 
 
 def suite():
