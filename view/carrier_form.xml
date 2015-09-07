@@ -2,9 +2,7 @@
 <data>
     <xpath expr="/form/field[@name='carrier_cost_method']" position="after">
         <newline/>
-        <group id='gls_unibox_config' string="GLS Unibox Configuration"
-            states="{'invisible': Not(Eval('carrier_cost_method') == 'gls')}"
-            colspan="4">
+        <group id='gls_unibox_config' string="GLS Unibox Configuration" colspan="4">
           <label name="gls_server"/>
           <field name="gls_server"/>
           <label name="gls_port"/>

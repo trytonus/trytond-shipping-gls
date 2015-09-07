@@ -121,6 +121,13 @@ class ShipmentOut:
     )
 
     @classmethod
+    def view_attributes(cls):
+        return super(ShipmentOut, cls).view_attributes() + [
+            ('//page[@id="gls"]', 'states', {
+                'invisible': ~Bool(Eval('is_gls_shipping'))
+            })]
+
+    @classmethod
     def __setup__(cls):
         super(ShipmentOut, cls).__setup__()
 
@@ -141,26 +148,22 @@ class ShipmentOut:
         """
         return self.carrier and self.carrier.carrier_cost_method == 'gls'
 
-    @fields.depends('is_gls_shipping', 'carrier')
+    @fields.depends(
+        'is_gls_shipping', 'carrier', 'gls_shipping_depot_number',
+        'gls_shipping_service_type'
+    )
     def on_change_carrier(self):
         """
         Show/Hide GLS tab in view on change of carrier
         """
-        res = super(ShipmentOut, self).on_change_carrier()
+        super(ShipmentOut, self).on_change_carrier()
 
         if self.carrier and self.carrier.carrier_cost_method == 'gls':
-            res['is_gls_shipping'] = True
-            res['gls_shipping_depot_number'] = \
-                self.carrier.gls_shipping_depot_number
-            res['gls_shipping_service_type'] = \
-                self.carrier.gls_shipping_service_type
-
-            # Future-proof: change active record
             self.is_gls_shipping = True
-            self.gls_shipping_depot_number = res['gls_shipping_depot_number']
-            self.gls_shipping_service_type = res['gls_shipping_service_type']
-
-        return res
+            self.gls_shipping_depot_number = \
+                self.carrier.gls_shipping_depot_number
+            self.gls_shipping_service_type = \
+                self.carrier.gls_shipping_service_type
 
     def _get_weight_uom(self):
         """
