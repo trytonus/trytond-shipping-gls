@@ -89,7 +89,7 @@ class Carrier:
     @classmethod
     def view_attributes(cls):
         return super(Carrier, cls).view_attributes() + [
-            ('//page[@id="gls_unibox_config"]', 'states', {
+            ('//group[@id="gls_unibox_config"]', 'states', {
                 'invisible':  Eval('carrier_cost_method') != 'gls'
             })]
 
