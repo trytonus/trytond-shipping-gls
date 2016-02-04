@@ -18,6 +18,7 @@ __all__ = [
 __metaclass__ = PoolMeta
 
 GLS_SERVICES = [
+    (None, ''),
     ('euro_business_parcel', '[Euro] Business Parcel(Standard)'),
     ('cash_service_dac', 'Cash Service DAC'),
     ('cash_service_exchange', 'Cash Service - Exchange Service'),
