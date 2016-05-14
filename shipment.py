@@ -116,7 +116,7 @@ class ShipmentOut:
     )
 
     gls_parcel_number = fields.Char(
-        "Parcel Number", size=12,
+        "GLS Parcel Number", size=12,
         readonly=True
     )
 
